@@ -2,7 +2,7 @@
   "name": "sftp-deploy-plus",
   "displayName": "SFTP Deploy+",
   "description": "Deploy files via SCP/SSH with configurable post-upload commands — like PhpStorm's SFTP.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "randomcode",
   "repository": {
     "type": "git",

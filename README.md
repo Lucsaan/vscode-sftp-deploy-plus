@@ -39,9 +39,9 @@ Create `.vscode/sftp-deploy.json`:
       "privateKey": "~/.ssh/id_rsa",
       "postUploadCommands": [
         {
-          "enabled": true,
           "type": "ssh",
           "command": "systemctl restart apache2",
+          "enabled": true,
           "continueOnError": false
         }
       ]
@@ -56,6 +56,8 @@ Create `.vscode/sftp-deploy.json`:
   ]
 }
 ```
+
+> ⚠️ Add `.vscode/sftp-deploy.json` to `.gitignore` if it contains passwords or private paths.
 
 ## Server Options
 
@@ -170,20 +172,27 @@ Use `"type": "docker"` to run commands **inside** the container:
   }
 ]
 ```
+## Post-Upload Commands
 
+Run commands automatically after every upload. Supports three types:
 
+| `type` | Runs on |
+|---|---|
+| `"ssh"` | Remote server via SSH |
+| `"docker"` | Inside the Docker container |
+| `"local"` | Developer's machine (requires Workspace Trust) |
 
 ```json
 "postUploadCommands": [
   {
     "type": "ssh",
-    "command": "systemctl restart apache2",
+    "command": "su -s /bin/bash otobo -c '/opt/otobo/bin/otobo.Console.pl Maint::Cache::Delete'",
     "enabled": true,
     "continueOnError": false
   },
   {
     "type": "ssh",
-    "command": "su -s /bin/bash otobo -c '/opt/otobo/bin/otobo.Console.pl Maint::Cache::Delete'",
+    "command": "systemctl restart apache2",
     "enabled": true,
     "continueOnError": false
   }
@@ -192,9 +201,9 @@ Use `"type": "docker"` to run commands **inside** the container:
 
 | Field | Description |
 |---|---|
-| `type` | `"ssh"` — runs on remote server |
+| `type` | `"ssh"`, `"docker"`, or `"local"` |
 | `command` | Shell command to execute |
-| `enabled` | Set to `false` to skip without deleting |
+| `enabled` | Set to `false` to skip without removing the entry |
 | `continueOnError` | If `true`, failure won't stop subsequent commands |
 
 ## Commands
