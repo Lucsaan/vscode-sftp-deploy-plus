@@ -3,6 +3,7 @@ import * as path from 'path';
 import { ConfigManager } from './configManager';
 import { Uploader } from './uploader';
 import { CommandRunner } from './commandRunner';
+import { DockerDeployer } from './dockerDeployer';
 import { StatusBarManager } from './statusBar';
 import { Logger } from './logger';
 import { KnownHostsManager } from './knownHosts';
@@ -22,6 +23,7 @@ export function activate(context: vscode.ExtensionContext) {
     const configManager = new ConfigManager(workspaceRoot);
     const knownHosts = new KnownHostsManager(context.globalStorageUri.fsPath);
     const uploader = new Uploader(logger, knownHosts);
+    const dockerDeployer = new DockerDeployer(logger, knownHosts);
     const commandRunner = new CommandRunner(logger, knownHosts);
     const statusBar = new StatusBarManager();
 
@@ -51,6 +53,13 @@ export function activate(context: vscode.ExtensionContext) {
 
     // ─── Core deploy function ───────────────────────────────────────────────────
 
+    function serverDescription(server: ServerConfig): string {
+        if (server.type === 'docker') {
+            return DockerDeployer.describe(server);
+        }
+        return `${server.user}@${server.host}`;
+    }
+
     async function deployFile(uri: vscode.Uri) {
         const server = activeServer;
         if (!server) {
@@ -69,17 +78,21 @@ export function activate(context: vscode.ExtensionContext) {
         logger.separator();
         logger.info(`Datei:   ${path.basename(filePath)}`);
         logger.info(`Lokal:   ${filePath}`);
-        logger.info(`Server:  ${server.name}  (${server.user}@${server.host})`);
-        logger.info(`Remote:  ${server.host}:${mapping.remotePath}`);
+        logger.info(`Server:  ${server.name}  (${serverDescription(server)})`);
+        logger.info(`Remote:  ${mapping.remotePath}`);
 
         statusBar.setUploading(true);
 
         try {
-            await uploader.uploadFile(filePath, server, mapping);
+            if (server.type === 'docker') {
+                await dockerDeployer.uploadFile(filePath, server, mapping);
+            } else {
+                await uploader.uploadFile(filePath, server, mapping);
+            }
 
             if (server.postUploadCommands?.length) {
                 logger.info('Running post-upload commands...');
-                await commandRunner.runAll(server.postUploadCommands, server);
+                await commandRunner.runAll(server.postUploadCommands, server, dockerDeployer);
             }
 
             logger.success(`Done ✓  ${path.basename(filePath)} → ${server.name}`);
@@ -110,17 +123,20 @@ export function activate(context: vscode.ExtensionContext) {
         logger.separator();
         logger.info(`Ordner:  ${path.basename(dirPath)}`);
         logger.info(`Lokal:   ${dirPath}`);
-        logger.info(`Server:  ${server.name}  (${server.user}@${server.host})`);
-        logger.info(`Remote:  ${server.host}:${mapping.remotePath}`);
+        logger.info(`Server:  ${server.name}  (${serverDescription(server)})`);
+        logger.info(`Remote:  ${mapping.remotePath}`);
 
         await vscode.window.withProgress(
             { location: vscode.ProgressLocation.Notification, title: `Uploading to ${server.name}...`, cancellable: false },
             async () => {
                 try {
-                    const count = await uploader.uploadDirectory(dirPath, server, mapping);
+                    const count = server.type === 'docker'
+                        ? await dockerDeployer.uploadDirectory(dirPath, server, mapping)
+                        : await uploader.uploadDirectory(dirPath, server, mapping);
+
                     if (server.postUploadCommands?.length) {
                         logger.info('Running post-upload commands...');
-                        await commandRunner.runAll(server.postUploadCommands, server);
+                        await commandRunner.runAll(server.postUploadCommands, server, dockerDeployer);
                     }
                     logger.success(`Done ✓ — ${count} file(s) uploaded`);
                     vscode.window.showInformationMessage(`SFTP: Uploaded ${count} file(s) to ${server.name}`);
@@ -218,7 +234,7 @@ export function activate(context: vscode.ExtensionContext) {
         } else {
             const server = configManager.getServer(picked.label);
             if (server) {
-                knownHosts.forget(server.host, server.port ?? 22);
+                knownHosts.forget(server.host ?? '', server.port ?? 22);
                 vscode.window.showInformationMessage(`SFTP Deploy: Host key for "${server.name}" removed.`);
             }
         }

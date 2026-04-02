@@ -1,0 +1,9 @@
+.vscode/**
+src/**
+.gitignore
+tsconfig.json
+**/*.map
+**/*.ts
+!out/**
+sftp.example.json
+sftp-deploy-*.vsix

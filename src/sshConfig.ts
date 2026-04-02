@@ -15,7 +15,7 @@ export function buildConnectConfig(server: ServerConfig, knownHosts: KnownHostsM
         port: server.port ?? 22,
         username: server.user,
         hostVerifier: (key: Buffer, callback: (valid: boolean) => void) => {
-            knownHosts.verify(server.host, server.port ?? 22, key)
+            knownHosts.verify(server.host ?? '', server.port ?? 22, key)
                 .then(callback)
                 .catch(() => callback(false));
         },

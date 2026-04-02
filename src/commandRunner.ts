@@ -6,6 +6,7 @@ import { PostUploadCommand, ServerConfig } from './types';
 import { Logger } from './logger';
 import { KnownHostsManager } from './knownHosts';
 import { buildConnectConfig } from './sshConfig';
+import { DockerDeployer } from './dockerDeployer';
 
 const execAsync = promisify(exec);
 
@@ -15,7 +16,7 @@ export class CommandRunner {
         private readonly knownHosts: KnownHostsManager,
     ) {}
 
-    async runAll(commands: PostUploadCommand[], server: ServerConfig): Promise<void> {
+    async runAll(commands: PostUploadCommand[], server: ServerConfig, dockerDeployer?: DockerDeployer): Promise<void> {
         for (const cmd of commands) {
             // Skip disabled commands
             if (cmd.enabled === false) {
@@ -25,6 +26,9 @@ export class CommandRunner {
             try {
                 if (cmd.type === 'local') {
                     await this.runLocal(cmd.command);
+                } else if (cmd.type === 'docker') {
+                    DockerDeployer.assertTrusted();
+                    await dockerDeployer!.runCommand(cmd, server);
                 } else {
                     await this.runSsh(cmd.command, server);
                 }

@@ -1,6 +1,6 @@
 export interface PostUploadCommand {
-    /** "local" runs the command on the local machine, "ssh" runs it on the remote server */
-    type: 'local' | 'ssh';
+    /** "local" runs on the developer's machine, "ssh" on the remote server, "docker" inside the container */
+    type: 'local' | 'ssh' | 'docker';
     command: string;
     /** Disable this command without removing it (default: true) */
     enabled?: boolean;
@@ -10,12 +10,28 @@ export interface PostUploadCommand {
 
 export interface ServerConfig {
     name: string;
-    host: string;
+    /** Transport type: "ssh" (default) uses SFTP, "docker" uses docker cp/exec */
+    type?: 'ssh' | 'docker';
+
+    // ─── SSH fields (type: "ssh") ────────────────────────────────────────────
+    host?: string;
     port?: number;           // default: 22
-    user: string;
+    user?: string;
     privateKey?: string;     // path to private key, ~ expanded
     password?: string;       // alternative to privateKey
     passphrase?: string;     // passphrase for encrypted private key
+
+    // ─── Docker fields (type: "docker") ──────────────────────────────────────
+    /** Docker container name or ID */
+    container?: string;
+    /** Optional: run docker commands via SSH on a remote host (host:port) instead of local docker */
+    dockerHost?: string;
+    dockerPort?: number;
+    dockerUser?: string;
+    dockerPrivateKey?: string;
+    dockerPassphrase?: string;
+    dockerPassword?: string;
+
     postUploadCommands?: PostUploadCommand[];
 }
 

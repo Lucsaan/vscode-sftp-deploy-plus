@@ -66,7 +66,80 @@ Create `.vscode/sftp-deploy.json`:
 | `passphrase` | — | Passphrase for encrypted private key |
 | `postUploadCommands` | — | Commands to run after upload (see below) |
 
-## Post-Upload Commands
+## Docker Support
+
+Set `"type": "docker"` to deploy files directly into a running container via `docker cp`.
+
+### Local Docker
+
+```json
+{
+  "servers": [
+    {
+      "name": "otobo-docker",
+      "type": "docker",
+      "container": "otobo_web_1",
+      "postUploadCommands": [
+        {
+          "type": "docker",
+          "command": "/opt/otobo/bin/otobo.Console.pl Maint::Cache::Delete"
+        }
+      ]
+    }
+  ],
+  "mappings": [
+    {
+      "localPath": "~/Development/my-addon/Kernel",
+      "remotePath": "/opt/otobo/Kernel"
+    }
+  ]
+}
+```
+
+### Remote Docker (via SSH)
+
+If Docker runs on a remote server, add `dockerHost` — the extension SSHs in and runs `docker cp` / `docker exec` there:
+
+```json
+{
+  "name": "otobo-remote-docker",
+  "type": "docker",
+  "container": "otobo_web_1",
+  "dockerHost": "192.168.1.100",
+  "dockerPort": 22,
+  "dockerUser": "root",
+  "dockerPrivateKey": "~/.ssh/id_rsa"
+}
+```
+
+### Docker Server Options
+
+| Option | Required | Description |
+|---|---|---|
+| `type` | ✅ | `"docker"` |
+| `container` | ✅ | Container name or ID |
+| `dockerHost` | — | SSH host for remote Docker (omit for local Docker) |
+| `dockerPort` | — | SSH port (default: 22) |
+| `dockerUser` | — | SSH user |
+| `dockerPrivateKey` | — | Path to SSH private key |
+| `dockerPassword` | — | SSH password (alternative to key) |
+
+### Post-Upload Commands for Docker
+
+Use `"type": "docker"` to run commands **inside** the container:
+
+```json
+"postUploadCommands": [
+  {
+    "type": "docker",
+    "command": "/opt/otobo/bin/otobo.Console.pl Maint::Cache::Delete",
+    "enabled": true,
+    "continueOnError": false
+  }
+]
+```
+
+
 
 ```json
 "postUploadCommands": [

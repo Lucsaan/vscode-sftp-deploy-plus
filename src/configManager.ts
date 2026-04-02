@@ -92,10 +92,17 @@ export class ConfigManager {
         }
         for (const server of cfg.servers ?? []) {
             if (!server.name) { errors.push('Each server must have a "name"'); }
-            if (!server.host) { errors.push(`Server "${server.name ?? '?'}" must have a "host"`); }
-            if (!server.user) { errors.push(`Server "${server.name ?? '?'}" must have a "user"`); }
-            if (!server.privateKey && !server.password) {
-                errors.push(`Server "${server.name ?? '?'}" must have either "privateKey" or "password"`);
+            if (server.type === 'docker') {
+                if (!server.container) {
+                    errors.push(`Docker server "${server.name ?? '?'}" must have a "container"`);
+                }
+            } else {
+                // SSH server (default)
+                if (!server.host) { errors.push(`Server "${server.name ?? '?'}" must have a "host"`); }
+                if (!server.user) { errors.push(`Server "${server.name ?? '?'}" must have a "user"`); }
+                if (!server.privateKey && !server.password) {
+                    errors.push(`Server "${server.name ?? '?'}" must have either "privateKey" or "password"`);
+                }
             }
         }
         if (!Array.isArray(cfg.mappings)) {
