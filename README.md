@@ -1,21 +1,24 @@
 # SFTP Deploy+
 
-> Deploy files to remote servers via SCP/SSH — with configurable post-upload commands.  
+> Deploy files to remote servers via SCP/SSH or Docker — with configurable post-upload commands.  
 > Inspired by PhpStorm's SFTP deployment, built for VS Code.
 
 ## Features
 
 - **Upload on Save** — automatically deploy files when you save them
 - **Multi-Server Support** — configure multiple servers, switch with one click from the status bar
-- **Post-Upload Commands** — run SSH commands on the remote server after every upload (e.g. clear cache, restart service)
+- **Docker Support** — deploy directly into containers via `docker cp` (local or remote via SSH)
+- **Post-Upload Commands** — run SSH or Docker commands after every upload (e.g. clear cache, restart service)
 - **Folder Upload** — deploy entire directories via Explorer context menu
 - **Path Mappings** — map multiple local project folders to remote paths
+- **Host Key Verification** — PhpStorm-style fingerprint check on first connection
+- **Off Mode** — disable deploy globally without changing your config
 
 ## Getting Started
 
 1. Install the extension
 2. Create `.vscode/sftp-deploy.json` in your workspace (see example below)
-3. Click the server name in the status bar to switch servers
+3. Click the server name in the status bar to switch servers or turn deploy off
 4. Toggle auto-upload with the sync icon, or use `SFTP: Toggle Auto-Upload`
 
 ## Configuration
@@ -24,7 +27,8 @@ Create `.vscode/sftp-deploy.json`:
 
 ```json
 {
-  "autoUpload": false,
+  "autoUpload": true,
+  "startupMode": "last",
   "defaultServer": "my-server",
   "servers": [
     {
@@ -65,6 +69,34 @@ Create `.vscode/sftp-deploy.json`:
 | `password` | — | Password (alternative to privateKey) |
 | `passphrase` | — | Passphrase for encrypted private key |
 | `postUploadCommands` | — | Commands to run after upload (see below) |
+
+## Global Options
+
+| Option | Default | Description |
+|---|---|---|
+| `autoUpload` | `false` | Deploy automatically on file save |
+| `startupMode` | `"last"` | Controls which server is active on startup (see below) |
+| `defaultServer` | first server | Server name to use when `startupMode` is `"default"` |
+
+### Startup Mode
+
+Controls which server is active when VS Code starts or reloads:
+
+| Value | Behavior |
+|---|---|
+| `"last"` | Remembers the last selected server (or Off) across sessions |
+| `"off"` | Always starts with no server — deploy is disabled until you pick one |
+| `"default"` | Always activates `defaultServer` on startup |
+
+```json
+"startupMode": "last"
+```
+
+## Off Mode
+
+Click the server name in the status bar and select **Off** to disable all deploys without changing your config. The status bar shows `⊘ SFTP: Off`.
+
+With `"startupMode": "last"`, VS Code remembers this choice and starts with deploy disabled next time.
 
 ## Docker Support
 

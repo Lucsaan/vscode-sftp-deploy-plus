@@ -47,9 +47,16 @@ export interface PathMapping {
 export interface SftpConfig {
     /** Enable auto-upload on file save (default: false) */
     autoUpload?: boolean;
-    /** Name of the server to use by default */
+    /** Name of the server to use by default (used when startupMode is "default") */
     defaultServer?: string;
-    /** If false, no server is selected on startup — deploy is effectively disabled until manually switched on (default: true) */
+    /**
+     * Controls which server is active on startup:
+     * - "off"     — always start with no server selected (deploy disabled)
+     * - "default" — always activate defaultServer (or first server if not set)
+     * - "last"    — remember the last selected server across sessions (default)
+     */
+    startupMode?: 'off' | 'default' | 'last';
+    /** @deprecated use startupMode: "off" instead */
     loadOnStart?: boolean;
     servers: ServerConfig[];
     /** Path mappings: which local folder maps to which remote path */

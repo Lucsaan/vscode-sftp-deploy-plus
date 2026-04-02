@@ -12,6 +12,10 @@ export class ConfigManager {
         this.configPath = path.join(workspaceRoot, '.vscode', 'sftp-deploy.json');
     }
 
+    getConfigPath(): string | undefined {
+        return this.configPath;
+    }
+
     load(): SftpConfig | undefined {
         if (!this.configPath || !fs.existsSync(this.configPath)) {
             return undefined;

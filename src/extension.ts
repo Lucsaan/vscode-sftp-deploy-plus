@@ -27,6 +27,8 @@ export function activate(context: vscode.ExtensionContext) {
     const commandRunner = new CommandRunner(logger, knownHosts);
     const statusBar = new StatusBarManager();
 
+    const LAST_SERVER_KEY = 'sftpDeploy.lastServer'; // workspaceState key
+
     // Load initial config
     function initFromConfig() {
         console.log('SFTP Deploy: initFromConfig() called');
@@ -38,8 +40,28 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         autoUploadEnabled = cfg.autoUpload ?? false;
-        // loadOnStart: false → start with no server selected (deploy disabled)
-        activeServer = (cfg.loadOnStart === false) ? undefined : configManager.getDefaultServer();
+
+        // Resolve startup mode (loadOnStart is deprecated but still supported)
+        const mode = cfg.startupMode ?? (cfg.loadOnStart === false ? 'off' : 'last');
+
+        if (mode === 'off') {
+            activeServer = undefined;
+        } else if (mode === 'default') {
+            activeServer = configManager.getDefaultServer();
+        } else {
+            // mode === 'last': restore last selected server (or none if Off was selected)
+            const lastName = context.workspaceState.get<string | null>(LAST_SERVER_KEY, null);
+            if (lastName === null) {
+                // Never set → fall back to defaultServer
+                activeServer = configManager.getDefaultServer();
+            } else if (lastName === '') {
+                // Explicitly set to Off last time
+                activeServer = undefined;
+            } else {
+                activeServer = configManager.getServer(lastName) ?? configManager.getDefaultServer();
+            }
+        }
+
         statusBar.setAutoUpload(autoUploadEnabled);
         statusBar.setServer(activeServer);
     }
@@ -61,10 +83,13 @@ export function activate(context: vscode.ExtensionContext) {
         return `${server.user}@${server.host}`;
     }
 
-    async function deployFile(uri: vscode.Uri) {
+    async function deployFile(uri: vscode.Uri, auto = false) {
         const server = activeServer;
         if (!server) {
-            vscode.window.showErrorMessage('SFTP Deploy: No server selected. Configure sftp-deploy.json first.');
+            // Auto-upload with no server active = Off mode, silently skip
+            if (!auto) {
+                vscode.window.showErrorMessage('SFTP Deploy: No server selected. Configure sftp-deploy.json first.');
+            }
             return;
         }
 
@@ -200,11 +225,13 @@ export function activate(context: vscode.ExtensionContext) {
 
         if (picked.label === OFF_LABEL) {
             activeServer = undefined;
+            context.workspaceState.update(LAST_SERVER_KEY, ''); // '' = Off
             statusBar.setServer(undefined);
             logger.info('Deploy disabled — no active server');
             vscode.window.setStatusBarMessage(`$(circle-slash) SFTP Deploy: Off`, 3000);
         } else {
             activeServer = configManager.getServer(picked.label);
+            context.workspaceState.update(LAST_SERVER_KEY, picked.label);
             statusBar.setServer(activeServer);
             logger.info(`Switched to server: ${picked.label}`);
             vscode.window.setStatusBarMessage(`$(arrow-swap) Server: ${picked.label}`, 3000);
@@ -220,13 +247,21 @@ export function activate(context: vscode.ExtensionContext) {
         logger.info(`Auto-upload ${state}`);
     });
 
-    // ─── Auto-upload on save (debounced to prevent double-fire) ──────────────────
+    // ─── Auto-upload on save (debounced, startup-safe) ───────────────────────────
+
+    // VS Code fires onDidSaveTextDocument for open files during startup/reload.
+    // We ignore all save events for the first 3 seconds after activation.
+    let startupComplete = false;
+    setTimeout(() => { startupComplete = true; }, 3000);
 
     const pendingUploads = new Map<string, ReturnType<typeof setTimeout>>();
 
     const onSave = vscode.workspace.onDidSaveTextDocument(async (doc) => {
+        if (!startupComplete) { return; }
         if (!autoUploadEnabled) { return; }
         if (doc.uri.scheme !== 'file') { return; }
+        // Never auto-deploy the extension's own config file
+        if (doc.uri.fsPath === configManager.getConfigPath()) { return; }
 
         const key = doc.uri.fsPath;
         const existing = pendingUploads.get(key);
@@ -234,7 +269,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         const timer = setTimeout(async () => {
             pendingUploads.delete(key);
-            await deployFile(doc.uri);
+            await deployFile(doc.uri, true);
         }, 300);
 
         pendingUploads.set(key, timer);
