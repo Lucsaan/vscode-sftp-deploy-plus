@@ -3,7 +3,11 @@
   "displayName": "SFTP Deploy+",
   "description": "Deploy files via SCP/SSH with configurable post-upload commands — like PhpStorm's SFTP.",
   "version": "0.1.0",
-  "publisher": "freicon",
+  "publisher": "randomcode",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lucsaan/vscode-sftp-deploy-plus"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
