@@ -1,15 +1,19 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import * as fs from 'fs';
+import * as vscode from 'vscode';
 import { Client } from 'ssh2';
 import { PostUploadCommand, ServerConfig } from './types';
-import { ConfigManager } from './configManager';
 import { Logger } from './logger';
+import { KnownHostsManager } from './knownHosts';
+import { buildConnectConfig } from './sshConfig';
 
 const execAsync = promisify(exec);
 
 export class CommandRunner {
-    constructor(private readonly logger: Logger) {}
+    constructor(
+        private readonly logger: Logger,
+        private readonly knownHosts: KnownHostsManager,
+    ) {}
 
     async runAll(commands: PostUploadCommand[], server: ServerConfig): Promise<void> {
         for (const cmd of commands) {
@@ -36,6 +40,15 @@ export class CommandRunner {
     }
 
     private async runLocal(command: string): Promise<void> {
+        // Local commands run in a shell on the developer's machine.
+        // Only allow this in trusted workspaces to prevent malicious repos from
+        // executing arbitrary code via a crafted sftp-deploy.json.
+        if (!vscode.workspace.isTrusted) {
+            throw new Error(
+                'Local post-upload commands are disabled in untrusted workspaces. ' +
+                'Trust this workspace in VS Code to enable them.'
+            );
+        }
         this.logger.info(`[local] $ ${command}`);
         const { stdout, stderr } = await execAsync(command);
         if (stdout.trim()) { this.logger.info(`[local] ${stdout.trim()}`); }
@@ -73,23 +86,8 @@ export class CommandRunner {
                 });
             });
 
-            conn.on('error', reject);
-            conn.connect(this.buildConnectConfig(server));
+            conn.on('error', (err) => { conn.end(); reject(err); });
+            conn.connect(buildConnectConfig(server, this.knownHosts));
         });
-    }
-
-    private buildConnectConfig(server: ServerConfig) {
-        const cfg: import('ssh2').ConnectConfig = {
-            host: server.host,
-            port: server.port ?? 22,
-            username: server.user,
-        };
-        if (server.privateKey) {
-            cfg.privateKey = fs.readFileSync(ConfigManager.expandPath(server.privateKey));
-            if (server.passphrase) { cfg.passphrase = server.passphrase; }
-        } else if (server.password) {
-            cfg.password = server.password;
-        }
-        return cfg;
     }
 }

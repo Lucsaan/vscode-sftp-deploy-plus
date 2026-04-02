@@ -100,6 +100,53 @@ Create `.vscode/sftp-deploy.json`:
 | `SFTP: Upload Folder` | Upload a folder (Explorer context menu) |
 | `SFTP: Switch Server` | Pick a different server from the list |
 | `SFTP: Toggle Auto-Upload` | Enable/disable upload on save |
+| `SFTP: Forget Host Key` | Remove a stored host key (e.g. after server rebuild) |
+
+## Security
+
+### Host Key Verification
+
+On the **first connection** to a server, the extension shows the server's SSH fingerprint and asks you to confirm:
+
+```
+SFTP Deploy: Unknown server "192.168.1.100:22"
+Fingerprint (SHA256): SHA256:abc123...
+
+[Trust and Connect]   [Cancel]
+```
+
+Once trusted, the fingerprint is stored locally. If it **ever changes**, you'll see a warning:
+
+```
+⚠️ Host key CHANGED for "192.168.1.100:22"
+Expected: SHA256:abc123...
+Received: SHA256:xyz789...
+
+This could indicate a man-in-the-middle attack.
+[Update and Connect]   [Cancel]
+```
+
+Stored fingerprints are saved in VS Code's global extension storage (not in your project). Use `SFTP: Forget Host Key` to remove a stored key when you intentionally rebuild a server.
+
+### Workspace Trust
+
+`local` post-upload commands (those with `"type": "local"`) run shell commands on your machine. This extension requires **[Workspace Trust](https://code.visualstudio.com/docs/editor/workspace-trust)** before executing any local commands.
+
+> **If you open an unknown repository, do not trust the workspace unless you have reviewed the `sftp-deploy.json` config.**
+
+SSH commands (`"type": "ssh"`) always run on the remote server — they are not affected by this restriction.
+
+### Config File & Credentials
+
+⚠️ **Never commit `sftp-deploy.json` to version control if it contains passwords.**
+
+Add it to your `.gitignore`:
+
+```
+.vscode/sftp-deploy.json
+```
+
+Prefer SSH keys over passwords wherever possible — they are more secure and never stored in the config file.
 
 ## Why not just use the SFTP extension?
 

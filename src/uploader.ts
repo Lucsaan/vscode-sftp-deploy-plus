@@ -1,12 +1,17 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Client, ConnectConfig, SFTPWrapper } from 'ssh2';
+import { Client, SFTPWrapper } from 'ssh2';
 import { ServerConfig, PathMapping } from './types';
 import { ConfigManager } from './configManager';
 import { Logger } from './logger';
+import { KnownHostsManager } from './knownHosts';
+import { buildConnectConfig } from './sshConfig';
 
 export class Uploader {
-    constructor(private readonly logger: Logger) {}
+    constructor(
+        private readonly logger: Logger,
+        private readonly knownHosts: KnownHostsManager,
+    ) {}
 
     async uploadFile(localFilePath: string, server: ServerConfig, mapping: PathMapping): Promise<void> {
         const localRoot = ConfigManager.expandPath(mapping.localPath);
@@ -20,7 +25,8 @@ export class Uploader {
         }
 
         const relativePath = localFilePath.slice(localRoot.length);
-        const remotePath = remoteRoot + relativePath.replace(/\\/g, '/');
+        // Normalize to prevent path traversal sequences (e.g. ../../etc) in remotePath
+        const remotePath = path.posix.normalize(remoteRoot + relativePath.replace(/\\/g, '/'));
 
         this.logger.info(`Uploading → ${server.name}:${remotePath}`);
 
@@ -51,21 +57,8 @@ export class Uploader {
         return results;
     }
 
-    private buildConnectConfig(server: ServerConfig): ConnectConfig {
-        const cfg: ConnectConfig = {
-            host: server.host,
-            port: server.port ?? 22,
-            username: server.user,
-        };
-        if (server.privateKey) {
-            cfg.privateKey = fs.readFileSync(ConfigManager.expandPath(server.privateKey));
-            if (server.passphrase) {
-                cfg.passphrase = server.passphrase;
-            }
-        } else if (server.password) {
-            cfg.password = server.password;
-        }
-        return cfg;
+    private buildConnectConfig(server: ServerConfig) {
+        return buildConnectConfig(server, this.knownHosts);
     }
 
     private sftpUpload(localPath: string, remotePath: string, server: ServerConfig): Promise<void> {
@@ -93,12 +86,16 @@ export class Uploader {
                 });
             });
 
-            conn.on('error', reject);
+            conn.on('error', (err) => { conn.end(); reject(err); });
             conn.connect(this.buildConnectConfig(server));
         });
     }
 
     private ensureRemoteDir(sftp: SFTPWrapper, dir: string): Promise<void> {
+        // Base case: root directory always exists
+        if (dir === '/' || dir === '.' || dir === '') {
+            return Promise.resolve();
+        }
         return new Promise((resolve, reject) => {
             sftp.stat(dir, (err) => {
                 if (!err) { return resolve(); }

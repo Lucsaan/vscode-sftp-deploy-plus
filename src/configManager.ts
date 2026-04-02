@@ -18,7 +18,23 @@ export class ConfigManager {
         }
         try {
             const raw = fs.readFileSync(this.configPath, 'utf-8');
-            this.config = JSON.parse(raw) as SftpConfig;
+            const parsed = JSON.parse(raw) as SftpConfig;
+            const errors = ConfigManager.validateConfig(parsed);
+            if (errors.length > 0) {
+                vscode.window.showErrorMessage(
+                    `SFTP Deploy: Invalid sftp-deploy.json:\n• ${errors.join('\n• ')}`
+                );
+                return undefined;
+            }
+            const hasPasswordServer = parsed.servers?.some(s => s.password && !s.privateKey);
+            if (hasPasswordServer) {
+                vscode.window.showWarningMessage(
+                    'SFTP Deploy: One or more servers use plain-text passwords in sftp-deploy.json. ' +
+                    'Make sure this file is in .gitignore and not committed to version control. ' +
+                    'Consider using SSH keys instead.'
+                );
+            }
+            this.config = parsed;
             return this.config;
         } catch (err) {
             vscode.window.showErrorMessage(`SFTP Deploy: Failed to parse sftp-deploy.json — ${err}`);
@@ -66,5 +82,29 @@ export class ConfigManager {
     /** Expand ~ in paths */
     static expandPath(p: string): string {
         return p.startsWith('~') ? path.join(os.homedir(), p.slice(1)) : p;
+    }
+
+    /** Validate config structure and return list of error messages */
+    static validateConfig(cfg: SftpConfig): string[] {
+        const errors: string[] = [];
+        if (!Array.isArray(cfg.servers) || cfg.servers.length === 0) {
+            errors.push('"servers" must be a non-empty array');
+        }
+        for (const server of cfg.servers ?? []) {
+            if (!server.name) { errors.push('Each server must have a "name"'); }
+            if (!server.host) { errors.push(`Server "${server.name ?? '?'}" must have a "host"`); }
+            if (!server.user) { errors.push(`Server "${server.name ?? '?'}" must have a "user"`); }
+            if (!server.privateKey && !server.password) {
+                errors.push(`Server "${server.name ?? '?'}" must have either "privateKey" or "password"`);
+            }
+        }
+        if (!Array.isArray(cfg.mappings)) {
+            errors.push('"mappings" must be an array');
+        }
+        for (const mapping of cfg.mappings ?? []) {
+            if (!mapping.localPath) { errors.push('Each mapping must have a "localPath"'); }
+            if (!mapping.remotePath) { errors.push('Each mapping must have a "remotePath"'); }
+        }
+        return errors;
     }
 }

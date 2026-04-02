@@ -5,6 +5,7 @@ import { Uploader } from './uploader';
 import { CommandRunner } from './commandRunner';
 import { StatusBarManager } from './statusBar';
 import { Logger } from './logger';
+import { KnownHostsManager } from './knownHosts';
 import { ServerConfig } from './types';
 
 let activeServer: ServerConfig | undefined;
@@ -19,8 +20,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     const logger = new Logger();
     const configManager = new ConfigManager(workspaceRoot);
-    const uploader = new Uploader(logger);
-    const commandRunner = new CommandRunner(logger);
+    const knownHosts = new KnownHostsManager(context.globalStorageUri.fsPath);
+    const uploader = new Uploader(logger, knownHosts);
+    const commandRunner = new CommandRunner(logger, knownHosts);
     const statusBar = new StatusBarManager();
 
     // Load initial config
@@ -192,6 +194,36 @@ export function activate(context: vscode.ExtensionContext) {
         await deployFile(doc.uri);
     });
 
+    const forgetHost = vscode.commands.registerCommand('sftpDeploy.forgetHost', async () => {
+        const cfg = configManager.get();
+        if (!cfg?.servers.length) {
+            vscode.window.showWarningMessage('SFTP Deploy: No servers configured.');
+            return;
+        }
+        const items: vscode.QuickPickItem[] = [
+            { label: '$(trash) Forget all hosts', description: 'Remove all stored host keys' },
+            ...cfg.servers.map(s => ({
+                label: s.name,
+                description: `${s.host}:${s.port ?? 22}`,
+            })),
+        ];
+        const picked = await vscode.window.showQuickPick(items, {
+            title: 'SFTP Deploy — Forget Host Key',
+            placeHolder: 'Which host key should be removed?',
+        });
+        if (!picked) { return; }
+        if (picked.label.includes('Forget all hosts')) {
+            knownHosts.forgetAll();
+            vscode.window.showInformationMessage('SFTP Deploy: All stored host keys removed.');
+        } else {
+            const server = configManager.getServer(picked.label);
+            if (server) {
+                knownHosts.forget(server.host, server.port ?? 22);
+                vscode.window.showInformationMessage(`SFTP Deploy: Host key for "${server.name}" removed.`);
+            }
+        }
+    });
+
     // ─── Register all disposables ────────────────────────────────────────────────
 
     context.subscriptions.push(
@@ -202,6 +234,7 @@ export function activate(context: vscode.ExtensionContext) {
         uploadFolder,
         switchServer,
         toggleAutoUpload,
+        forgetHost,
         onSave,
     );
 }
