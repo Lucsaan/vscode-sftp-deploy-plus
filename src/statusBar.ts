@@ -19,11 +19,13 @@ export class StatusBarManager {
 
     setServer(server: ServerConfig | undefined) {
         if (!server) {
-            this.item.text = '$(cloud-upload) SFTP: no server';
+            this.item.text = '$(circle-slash) SFTP: Off';
+            this.item.tooltip = 'SFTP Deploy — Off (click to select a server)';
             this.item.backgroundColor = undefined;
         } else {
             const autoIcon = this.autoUpload ? '$(sync)' : '$(cloud-upload)';
             this.item.text = `${autoIcon} ${server.name}`;
+            this.item.tooltip = 'SFTP Deploy — click to switch server';
         }
         this.item.show();
     }

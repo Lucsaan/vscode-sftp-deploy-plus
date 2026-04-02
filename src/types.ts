@@ -49,6 +49,8 @@ export interface SftpConfig {
     autoUpload?: boolean;
     /** Name of the server to use by default */
     defaultServer?: string;
+    /** If false, no server is selected on startup — deploy is effectively disabled until manually switched on (default: true) */
+    loadOnStart?: boolean;
     servers: ServerConfig[];
     /** Path mappings: which local folder maps to which remote path */
     mappings: PathMapping[];

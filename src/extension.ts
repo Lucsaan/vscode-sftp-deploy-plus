@@ -38,7 +38,8 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         autoUploadEnabled = cfg.autoUpload ?? false;
-        activeServer = configManager.getDefaultServer();
+        // loadOnStart: false → start with no server selected (deploy disabled)
+        activeServer = (cfg.loadOnStart === false) ? undefined : configManager.getDefaultServer();
         statusBar.setAutoUpload(autoUploadEnabled);
         statusBar.setServer(activeServer);
     }
@@ -174,18 +175,35 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        const items: vscode.QuickPickItem[] = cfg.servers.map(s => ({
-            label: s.name,
-            description: `${s.user}@${s.host}${s.port && s.port !== 22 ? ':' + s.port : ''}`,
-            detail: s.postUploadCommands?.filter(c => c.enabled !== false).map(c => c.command).join(' → ') ?? '',
-        }));
+        const OFF_LABEL = '$(circle-slash) Off — disable deploy';
+
+        const items: vscode.QuickPickItem[] = [
+            {
+                label: OFF_LABEL,
+                description: 'No server active — uploads and auto-deploy are disabled',
+            },
+            ...cfg.servers.map(s => ({
+                label: s.name,
+                description: s.type === 'docker'
+                    ? DockerDeployer.describe(s)
+                    : `${s.user}@${s.host}${s.port && s.port !== 22 ? ':' + s.port : ''}`,
+                detail: s.postUploadCommands?.filter(c => c.enabled !== false).map(c => c.command).join(' → ') ?? '',
+            })),
+        ];
 
         const picked = await vscode.window.showQuickPick(items, {
             title: 'SFTP Deploy — Select Server',
-            placeHolder: 'Choose a server...',
+            placeHolder: 'Choose a server, or select Off to disable deploy...',
         });
 
-        if (picked) {
+        if (!picked) { return; }
+
+        if (picked.label === OFF_LABEL) {
+            activeServer = undefined;
+            statusBar.setServer(undefined);
+            logger.info('Deploy disabled — no active server');
+            vscode.window.setStatusBarMessage(`$(circle-slash) SFTP Deploy: Off`, 3000);
+        } else {
             activeServer = configManager.getServer(picked.label);
             statusBar.setServer(activeServer);
             logger.info(`Switched to server: ${picked.label}`);
