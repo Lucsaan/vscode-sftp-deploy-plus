@@ -202,12 +202,24 @@ export function activate(context: vscode.ExtensionContext) {
         logger.info(`Auto-upload ${state}`);
     });
 
-    // ─── Auto-upload on save ─────────────────────────────────────────────────────
+    // ─── Auto-upload on save (debounced to prevent double-fire) ──────────────────
+
+    const pendingUploads = new Map<string, ReturnType<typeof setTimeout>>();
 
     const onSave = vscode.workspace.onDidSaveTextDocument(async (doc) => {
         if (!autoUploadEnabled) { return; }
         if (doc.uri.scheme !== 'file') { return; }
-        await deployFile(doc.uri);
+
+        const key = doc.uri.fsPath;
+        const existing = pendingUploads.get(key);
+        if (existing) { clearTimeout(existing); }
+
+        const timer = setTimeout(async () => {
+            pendingUploads.delete(key);
+            await deployFile(doc.uri);
+        }, 300);
+
+        pendingUploads.set(key, timer);
     });
 
     const forgetHost = vscode.commands.registerCommand('sftpDeploy.forgetHost', async () => {
