@@ -1,0 +1,52 @@
+{
+  "autoUpload": false,
+  "defaultServer": "my-server",
+  "servers": [
+    {
+      "name": "my-server",
+      "host": "192.168.1.100",
+      "port": 22,
+      "user": "root",
+      "privateKey": "~/.ssh/id_rsa",
+      "postUploadCommands": [
+        {
+          "enabled": true,
+          "type": "ssh",
+          "command": "systemctl restart apache2",
+          "continueOnError": false
+        }
+      ]
+    },
+    {
+      "name": "my-server-with-password",
+      "host": "192.168.1.101",
+      "port": 22,
+      "user": "root",
+      "password": "mysecretpassword",
+      "postUploadCommands": [
+        {
+          "enabled": true,
+          "type": "ssh",
+          "command": "systemctl restart apache2",
+          "continueOnError": false
+        }
+      ]
+    },
+    {
+      "name": "my-server-key-with-passphrase",
+      "host": "192.168.1.102",
+      "port": 22,
+      "user": "root",
+      "privateKey": "~/.ssh/id_rsa",
+      "passphrase": "mykeypassphrase",
+      "postUploadCommands": []
+    }
+  ],
+  "mappings": [
+    {
+      "name": "my-project",
+      "localPath": "~/Development/my-project/src",
+      "remotePath": "/var/www/html"
+    }
+  ]
+}

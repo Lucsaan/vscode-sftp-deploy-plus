@@ -1,0 +1,81 @@
+{
+  "name": "sftp-deploy-plus",
+  "displayName": "SFTP Deploy+",
+  "description": "Deploy files via SCP/SSH with configurable post-upload commands — like PhpStorm's SFTP.",
+  "version": "0.1.0",
+  "publisher": "freicon",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "workspaceContains:.vscode/sftp-deploy.json",
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sftpDeploy.uploadFile",
+        "title": "SFTP: Upload Current File"
+      },
+      {
+        "command": "sftpDeploy.switchServer",
+        "title": "SFTP: Switch Server"
+      },
+      {
+        "command": "sftpDeploy.toggleAutoUpload",
+        "title": "SFTP: Toggle Auto-Upload"
+      },
+      {
+        "command": "sftpDeploy.uploadFolder",
+        "title": "SFTP: Upload Folder"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "sftpDeploy.uploadFile",
+          "when": "resourceScheme == file",
+          "group": "sftp"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "sftpDeploy.uploadFile",
+          "when": "resourceScheme == file && !explorerResourceIsFolder",
+          "group": "sftp"
+        },
+        {
+          "command": "sftpDeploy.uploadFolder",
+          "when": "resourceScheme == file && explorerResourceIsFolder",
+          "group": "sftp"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "SFTP Deploy",
+      "properties": {
+        "sftpDeploy.showOutputOnUpload": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show output panel automatically on upload"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "ssh2": "^1.15.0",
+    "@types/ssh2": "^1.11.19"
+  }
+}
